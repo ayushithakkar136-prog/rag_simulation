@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>RAG Simulator</title>
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:Inter,system-ui,sans-serif;
+}
+
+body{
+    background:linear-gradient(135deg,#0f172a,#111827,#1e293b);
+    min-height:100vh;
+    color:white;
+    padding:30px;
+}
+
+.container{
+    max-width:1400px;
+    margin:auto;
+}
+
+h1{
+    font-size:42px;
+    margin-bottom:8px;
+}
+
+.subtitle{
+    color:#94a3b8;
+    margin-bottom:30px;
+}
+
+.card{
+    background:rgba(255,255,255,0.06);
+    border:1px solid rgba(255,255,255,0.1);
+    backdrop-filter:blur(12px);
+    border-radius:20px;
+    padding:20px;
+}
+
+.grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:20px;
+}
+
+textarea{
+    width:100%;
+    height:170px;
+    resize:none;
+    border:none;
+    outline:none;
+    border-radius:12px;
+    padding:14px;
+    background:#0f172a;
+    color:white;
+    margin-top:10px;
+}
+
+input{
+    width:100%;
+    padding:14px;
+    border:none;
+    outline:none;
+    border-radius:12px;
+    background:#0f172a;
+    color:white;
+    margin-top:10px;
+}
+
+button{
+    padding:14px 24px;
+    border:none;
+    border-radius:12px;
+    cursor:pointer;
+    font-size:15px;
+    font-weight:600;
+    color:white;
+    background:linear-gradient(90deg,#6366f1,#8b5cf6);
+    transition:0.2s;
+}
+
+button:hover{
+    transform:translateY(-2px);
+}
+
+.steps{
+    display:grid;
+    grid-template-columns:repeat(6,1fr);
+    gap:10px;
+    margin-top:25px;
+}
+
+.step{
+    background:#111827;
+    border-radius:14px;
+    padding:14px;
+    text-align:center;
+    border:1px solid #1f2937;
+    opacity:0.35;
+    transition:0.4s;
+}
+
+.step.active{
+    opacity:1;
+    border-color:#6366f1;
+    box-shadow:0 0 20px rgba(99,102,241,.4);
+}
+
+.step-number{
+    width:30px;
+    height:30px;
+    border-radius:50%;
+    background:#6366f1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin:auto auto 10px;
+}
+
+.output{
+    margin-top:20px;
+    display:grid;
+    gap:15px;
+}
+
+.box{
+    background:#0f172a;
+    border-radius:14px;
+    padding:15px;
+}
+
+.label{
+    color:#818cf8;
+    font-weight:700;
+    margin-bottom:8px;
+}
+
+.chunk{
+    background:#1e293b;
+    padding:10px;
+    border-radius:10px;
+    margin-top:8px;
+}
+
+.score{
+    color:#22c55e;
+    font-weight:bold;
+}
+
+.answer{
+    font-size:18px;
+    line-height:1.7;
+}
+
+@media(max-width:1100px){
+    .grid{
+        grid-template-columns:1fr;
+    }
+
+    .steps{
+        grid-template-columns:repeat(3,1fr);
+    }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+    <h1>RAG Simulator</h1>
+    <div class="subtitle">
+        Learn Retrieval Augmented Generation step-by-step.
+    </div>
+
+    <div class="grid">
+
+        <div class="card">
+            <h2>Knowledge Base</h2>
+
+            <textarea id="docs">
+RAG stands for Retrieval Augmented Generation. It allows an LLM to answer questions using external knowledge.
+
+Embeddings convert text into vectors so semantic similarity can be measured.
+
+Vector databases store embeddings and enable similarity search.
+
+Chunking splits large documents into smaller pieces before embedding.
+
+Retrieval finds the most relevant chunks related to the user's question.
+
+Context is created by combining retrieved chunks with the original query.
+
+The LLM receives both the question and retrieved context to generate a grounded answer.
+
+RAG reduces hallucinations because answers come from retrieved information.
+            </textarea>
+
+            <h2 style="margin-top:20px;">User Question</h2>
+
+            <input
+                id="query"
+                value="How does RAG reduce hallucinations?"
+            />
+
+            <div style="margin-top:20px;">
+                <button onclick="runRAG()">
+                    Run RAG Pipeline
+                </button>
+            </div>
+        </div>
+
+        <div class="card">
+
+            <h2>Pipeline</h2>
+
+            <div class="steps">
+                <div class="step" id="s1">
+                    <div class="step-number">1</div>
+                    Chunking
+                </div>
+
+                <div class="step" id="s2">
+                    <div class="step-number">2</div>
+                    Embeddings
+                </div>
+
+                <div class="step" id="s3">
+                    <div class="step-number">3</div>
+                    Vector DB
+                </div>
+
+                <div class="step" id="s4">
+                    <div class="step-number">4</div>
+                    Retrieval
+                </div>
+
+                <div class="step" id="s5">
+                    <div class="step-number">5</div>
+                    Context
+                </div>
+
+                <div class="step" id="s6">
+                    <div class="step-number">6</div>
+                    Generation
+                </div>
+            </div>
+
+            <div class="output">
+
+                <div class="box">
+                    <div class="label">Chunks</div>
+                    <div id="chunks"></div>
+                </div>
+
+                <div class="box">
+                    <div class="label">Retrieved Chunks</div>
+                    <div id="retrieved"></div>
+                </div>
+
+                <div class="box">
+                    <div class="label">Prompt Sent To LLM</div>
+                    <div id="prompt"></div>
+                </div>
+
+                <div class="box">
+                    <div class="label">Generated Answer</div>
+                    <div id="answer" class="answer"></div>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+</div>
+
+<script>
+function sleep(ms){
+    return new Promise(resolve=>setTimeout(resolve,ms));
+}
+
+function activate(id){
+    document.querySelectorAll(".step")
+        .forEach(s=>s.classList.remove("active"));
+
+    for(let i=1;i<=id;i++){
+        document.getElementById("s"+i)
+        .classList.add("active");
+    }
+}
+
+function tokenize(text){
+    return text
+    .toLowerCase()
+    .replace(/[^\w\s]/g,"")
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function similarity(a,b){
+
+    const setA = new Set(tokenize(a));
+    const setB = new Set(tokenize(b));
+
+    let intersection = 0;
+
+    setA.forEach(word=>{
+        if(setB.has(word)) intersection++;
+    });
+
+    return intersection;
+}
+
+async function runRAG(){
+
+    document.getElementById("chunks").innerHTML="";
+    document.getElementById("retrieved").innerHTML="";
+    document.getElementById("prompt").innerHTML="";
+    document.getElementById("answer").innerHTML="";
+
+    const docs =
+    document.getElementById("docs")
+    .value
+    .split("\n")
+    .filter(x=>x.trim()!=='');
+
+    const query =
+    document.getElementById("query").value;
+
+    activate(1);
+    await sleep(700);
+
+    // Chunking
+    const chunksDiv=document.getElementById("chunks");
+
+    docs.forEach((chunk,i)=>{
+        chunksDiv.innerHTML +=
+        `<div class="chunk">
+        Chunk ${i+1}: ${chunk}
+        </div>`;
+    });
+
+    activate(2);
+    await sleep(700);
+
+    // Embeddings
+    const vectors=docs.map(chunk=>({
+        text:chunk,
+        vector:tokenize(chunk)
+    }));
+
+    activate(3);
+    await sleep(700);
+
+    // Vector DB
+    const vectorDB=vectors;
+
+    activate(4);
+    await sleep(700);
+
+    // Retrieval
+    const ranked = vectorDB
+        .map(v=>({
+            text:v.text,
+            score:similarity(query,v.text)
+        }))
+        .sort((a,b)=>b.score-a.score)
+        .slice(0,3);
+
+    ranked.forEach(r=>{
+        document.getElementById("retrieved").innerHTML +=
+        `<div class="chunk">
+            <div class="score">
+                Similarity Score: ${r.score}
+            </div>
+            ${r.text}
+        </div>`;
+    });
+
+    activate(5);
+    await sleep(700);
+
+    const context =
+    ranked.map(r=>r.text).join("\n");
+
+    const prompt = `
+Question:
+${query}
+
+Retrieved Context:
+${context}
+
+Answer using only retrieved context.
+`;
+
+    document.getElementById("prompt")
+    .innerText=prompt;
+
+    activate(6);
+    await sleep(700);
+
+    let answer =
+    ranked[0]?.text ||
+    "No relevant information found.";
+
+    document.getElementById("answer")
+    .innerText=answer;
+}
+
+runRAG();
+</script>
+
+</body>
+</html>
