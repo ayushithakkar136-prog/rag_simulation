@@ -1,420 +1,433 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>RAG Simulator</title>
-
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RAG Simulator — Retrieval-Augmented Generation, worked by hand</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-*{
-    margin:0;
-    padding:0;
-    box-sizing:border-box;
-    font-family:Inter,system-ui,sans-serif;
-}
+  :root{
+    --bg: #fafafa;
+    --surface: #ffffff;
+    --border: #e7e7ea;
+    --border-soft: #f0f0f2;
+    --text: #18181b;
+    --text-dim: #71717a;
+    --text-faint: #b0b0b6;
+    --accent: #4338ca;
+    --accent-soft: #eef0fd;
+    --accent-line: #c7cbf5;
+    --sans: 'Inter', -apple-system, sans-serif;
+    --mono: 'JetBrains Mono', monospace;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    padding: 48px 24px 80px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap{ max-width: 1080px; margin: 0 auto; }
 
-body{
-    background:linear-gradient(135deg,#0f172a,#111827,#1e293b);
-    min-height:100vh;
-    color:white;
-    padding:30px;
-}
+  header{ margin-bottom: 40px; max-width: 640px; }
+  .kicker{
+    font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 10px; font-weight: 500;
+  }
+  h1{
+    font-size: clamp(28px, 4vw, 38px); font-weight: 700; letter-spacing: -0.02em;
+    margin: 0 0 10px; line-height: 1.15;
+  }
+  header p{ color: var(--text-dim); font-size: 15.5px; line-height: 1.6; margin: 0; }
 
-.container{
-    max-width:1400px;
-    margin:auto;
-}
+  .grid{ display:grid; grid-template-columns: 300px 1fr; gap: 20px; align-items:start; }
+  @media (max-width: 880px){ .grid{ grid-template-columns: 1fr; } }
 
-h1{
-    font-size:42px;
-    margin-bottom:8px;
-}
+  .panel{
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+    padding: 20px;
+  }
+  .panel-title{
+    font-size: 13px; font-weight: 600; color: var(--text); margin: 0 0 14px;
+    display:flex; align-items:center; gap: 8px;
+  }
+  .panel-title .count{
+    font-family: var(--mono); font-size: 11px; color: var(--text-faint); font-weight: 400;
+  }
 
-.subtitle{
-    color:#94a3b8;
-    margin-bottom:30px;
-}
+  /* corpus */
+  #docList{ display:flex; flex-direction:column; gap:8px; max-height: 420px; overflow-y:auto; margin-bottom: 14px; padding-right: 2px; }
+  .doc-card{
+    border: 1px solid var(--border-soft); border-radius: 10px; background: #fcfcfd;
+    padding: 11px 12px; font-size: 13px; line-height: 1.5; position: relative;
+  }
+  .doc-card .doc-title{
+    font-size: 12.5px; font-weight: 600; color: var(--text); display:block; margin-bottom: 3px;
+    padding-right: 20px;
+  }
+  .doc-card p{ margin:0; color: var(--text-dim); }
+  .doc-card button{
+    position:absolute; top:9px; right:9px; width:20px; height:20px; border-radius:6px;
+    background:none; border:none; color: var(--text-faint);
+    font-size:15px; cursor:pointer; line-height:1; display:flex; align-items:center; justify-content:center;
+  }
+  .doc-card button:hover{ background: #fdeeee; color: #dc2626; }
 
-.card{
-    background:rgba(255,255,255,0.06);
-    border:1px solid rgba(255,255,255,0.1);
-    backdrop-filter:blur(12px);
-    border-radius:20px;
-    padding:20px;
-}
+  textarea, input[type=text]{
+    width:100%; background: #fcfcfd; border:1px solid var(--border); border-radius: 10px;
+    color: var(--text); font-family: var(--sans); font-size:13.5px;
+    padding: 10px 12px; resize: vertical;
+  }
+  textarea::placeholder, input::placeholder{ color: var(--text-faint); }
+  textarea:focus, input[type=text]:focus, button:focus-visible{
+    outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  #newDoc{ min-height: 64px; margin-bottom: 10px; }
 
-.grid{
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:20px;
-}
+  .btn{
+    font-family: var(--sans); font-size: 13px; font-weight: 600;
+    background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    padding: 9px 15px; border-radius: 9px; cursor:pointer; transition: all .15s;
+  }
+  .btn:hover{ border-color: var(--text-faint); background: #f7f7f8; }
+  .btn.primary{ background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover{ background: #362ea3; border-color: #362ea3; }
+  .btn:disabled{ opacity:0.4; cursor:not-allowed; }
+  .row{ display:flex; gap:8px; flex-wrap:wrap; }
 
-textarea{
-    width:100%;
-    height:170px;
-    resize:none;
-    border:none;
-    outline:none;
-    border-radius:12px;
-    padding:14px;
-    background:#0f172a;
-    color:white;
-    margin-top:10px;
-}
+  /* query */
+  .query-row{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom: 14px; }
+  .query-row input{ flex:1; min-width:200px; }
+  .k-control{
+    display:flex; align-items:center; gap:10px; font-family: var(--mono); font-size:12px; color: var(--text-dim);
+  }
+  .k-control input[type=range]{ accent-color: var(--accent); width: 100px; }
+  .k-control span{ color: var(--text); font-weight:600; min-width: 10px; display:inline-block; }
 
-input{
-    width:100%;
-    padding:14px;
-    border:none;
-    outline:none;
-    border-radius:12px;
-    background:#0f172a;
-    color:white;
-    margin-top:10px;
-}
+  /* pipeline */
+  .pipeline{
+    display:flex; align-items:flex-start; justify-content:space-between;
+    margin: 22px 0 4px; padding: 0 4px;
+  }
+  .pipeline .stage{ display:flex; flex-direction:column; align-items:center; gap:7px; position:relative; flex:1; }
+  .pipeline .num{
+    width:24px; height:24px; border-radius:50%; border: 1.5px solid var(--border);
+    display:flex; align-items:center; justify-content:center;
+    font-family: var(--mono); font-size: 11px; color: var(--text-faint); background: var(--surface);
+    transition: all .2s; z-index:1;
+  }
+  .pipeline .stage span{ font-size: 11.5px; color: var(--text-faint); font-weight:500; transition: color .2s; }
+  .pipeline .stage.active .num{ background: var(--accent); border-color: var(--accent); color: #fff; }
+  .pipeline .stage.active span{ color: var(--text); }
+  .pipeline .connector{
+    position:absolute; top:12px; left:50%; width:100%; height:1.5px; background: var(--border-soft); z-index:0;
+  }
+  .pipeline .stage:last-child .connector{ display:none; }
 
-button{
-    padding:14px 24px;
-    border:none;
-    border-radius:12px;
-    cursor:pointer;
-    font-size:15px;
-    font-weight:600;
-    color:white;
-    background:linear-gradient(90deg,#6366f1,#8b5cf6);
-    transition:0.2s;
-}
+  /* results */
+  #results{ margin-top: 18px; display:flex; flex-direction:column; gap:7px; }
+  .chunk{
+    display:grid; grid-template-columns: 26px 1fr 110px; gap: 12px; align-items:center;
+    border: 1px solid var(--border-soft); border-radius: 11px; padding: 11px 13px; font-size: 13.5px;
+    background: #fcfcfd; transition: border-color .2s, background .2s, opacity .2s;
+  }
+  .chunk.retrieved{ border-color: var(--accent-line); background: var(--accent-soft); }
+  .chunk.dim{ opacity: 0.45; }
+  .chunk .rank{ font-family: var(--mono); font-size: 13px; color: var(--text-faint); text-align:center; }
+  .chunk.retrieved .rank{ color: var(--accent); font-weight:600; }
+  .chunk .text{ line-height:1.5; color: var(--text); }
+  .chunk .text .src{
+    font-family: var(--mono); font-size:10.5px; color: var(--text-faint); display:block; margin-bottom:3px; letter-spacing:0.03em;
+  }
+  .chunk mark{ background: transparent; color: var(--accent); font-weight:600; }
+  .simbar-wrap{ display:flex; flex-direction:column; gap:5px; align-items:flex-end; }
+  .simbar{ width:100%; height:4px; border-radius: 3px; background: var(--border-soft); position:relative; overflow:hidden; }
+  .simbar i{ position:absolute; left:0; top:0; bottom:0; background: var(--text-faint); border-radius:3px; transition: width .4s ease; }
+  .chunk.retrieved .simbar i{ background: var(--accent); }
+  .simscore{ font-family: var(--mono); font-size:11px; color: var(--text-dim); }
 
-button:hover{
-    transform:translateY(-2px);
-}
+  /* answer */
+  #answerBox{
+    margin-top: 18px; border: 1px solid var(--accent-line); border-radius: 14px;
+    padding: 18px 20px; background: var(--accent-soft); font-size: 14.5px; line-height:1.65;
+    display:none; color: var(--text);
+  }
+  #answerBox.show{ display:block; }
+  #answerBox .label{
+    font-family: var(--mono); font-size:11px; letter-spacing:0.08em; text-transform:uppercase;
+    color: var(--accent); margin-bottom:9px; display:block; font-weight:600;
+  }
+  #answerBox .note{
+    margin-top:12px; padding-top:11px; border-top:1px solid var(--accent-line);
+    font-size: 12px; color: var(--text-dim); line-height:1.6;
+  }
 
-.steps{
-    display:grid;
-    grid-template-columns:repeat(6,1fr);
-    gap:10px;
-    margin-top:25px;
-}
+  .empty-hint{ font-family: var(--mono); font-size:12.5px; color: var(--text-faint); padding: 14px 2px; }
 
-.step{
-    background:#111827;
-    border-radius:14px;
-    padding:14px;
-    text-align:center;
-    border:1px solid #1f2937;
-    opacity:0.35;
-    transition:0.4s;
-}
+  details{ margin-top: 22px; border: 1px solid var(--border); border-radius: 14px; padding: 4px 18px; background: var(--surface); }
+  summary{
+    cursor:pointer; font-size:13px; font-weight:600; color: var(--text); padding: 13px 0;
+    list-style: none; display:flex; align-items:center; gap:8px;
+  }
+  summary::before{ content:'+'; color: var(--accent); font-weight:700; width:14px; }
+  details[open] summary::before{ content:'–'; }
+  details[open] summary{ border-bottom: 1px solid var(--border-soft); margin-bottom: 12px; }
+  .explain{ font-size: 13.5px; color: var(--text-dim); line-height:1.7; padding-bottom: 16px; }
+  .explain code{
+    font-family: var(--mono); font-size: 12px; color: var(--accent); background: var(--accent-soft);
+    padding: 2px 6px; border-radius: 4px;
+  }
 
-.step.active{
-    opacity:1;
-    border-color:#6366f1;
-    box-shadow:0 0 20px rgba(99,102,241,.4);
-}
+  ::-webkit-scrollbar{ width:7px; }
+  ::-webkit-scrollbar-thumb{ background: var(--border); border-radius: 4px; }
 
-.step-number{
-    width:30px;
-    height:30px;
-    border-radius:50%;
-    background:#6366f1;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    margin:auto auto 10px;
-}
-
-.output{
-    margin-top:20px;
-    display:grid;
-    gap:15px;
-}
-
-.box{
-    background:#0f172a;
-    border-radius:14px;
-    padding:15px;
-}
-
-.label{
-    color:#818cf8;
-    font-weight:700;
-    margin-bottom:8px;
-}
-
-.chunk{
-    background:#1e293b;
-    padding:10px;
-    border-radius:10px;
-    margin-top:8px;
-}
-
-.score{
-    color:#22c55e;
-    font-weight:bold;
-}
-
-.answer{
-    font-size:18px;
-    line-height:1.7;
-}
-
-@media(max-width:1100px){
-    .grid{
-        grid-template-columns:1fr;
-    }
-
-    .steps{
-        grid-template-columns:repeat(3,1fr);
-    }
-}
+  @media (prefers-reduced-motion: reduce){ *{ transition: none !important; } }
 </style>
 </head>
 <body>
+<div class="wrap">
 
-<div class="container">
-
+  <header>
+    <p class="kicker">Interactive · TF–cosine retrieval</p>
     <h1>RAG Simulator</h1>
-    <div class="subtitle">
-        Learn Retrieval Augmented Generation step-by-step.
+    <p>Watch a query get chunked, scored, and retrieved against a small document store — then see a rule-based answer stitched from what came back.</p>
+  </header>
+
+  <div class="grid">
+    <!-- CORPUS -->
+    <div class="panel">
+      <p class="panel-title">Document store <span class="count" id="docCount"></span></p>
+      <div id="docList"></div>
+      <textarea id="newDoc" placeholder="Add a document to the corpus — a paragraph or two of your own text..."></textarea>
+      <div class="row">
+        <button class="btn" id="addDocBtn">+ Add document</button>
+        <button class="btn" id="resetDocsBtn">Reset sample set</button>
+      </div>
     </div>
 
-    <div class="grid">
-
-        <div class="card">
-            <h2>Knowledge Base</h2>
-
-            <textarea id="docs">
-RAG stands for Retrieval Augmented Generation. It allows an LLM to answer questions using external knowledge.
-
-Embeddings convert text into vectors so semantic similarity can be measured.
-
-Vector databases store embeddings and enable similarity search.
-
-Chunking splits large documents into smaller pieces before embedding.
-
-Retrieval finds the most relevant chunks related to the user's question.
-
-Context is created by combining retrieved chunks with the original query.
-
-The LLM receives both the question and retrieved context to generate a grounded answer.
-
-RAG reduces hallucinations because answers come from retrieved information.
-            </textarea>
-
-            <h2 style="margin-top:20px;">User Question</h2>
-
-            <input
-                id="query"
-                value="How does RAG reduce hallucinations?"
-            />
-
-            <div style="margin-top:20px;">
-                <button onclick="runRAG()">
-                    Run RAG Pipeline
-                </button>
-            </div>
+    <!-- QUERY / PIPELINE / RESULTS -->
+    <div class="panel">
+      <p class="panel-title">Query</p>
+      <div class="query-row">
+        <input type="text" id="queryInput" placeholder="Ask something the corpus might answer — e.g. how do we handle scope changes?">
+        <button class="btn primary" id="runBtn">Run retrieval →</button>
+      </div>
+      <div class="row">
+        <div class="k-control">
+          TOP-K <input type="range" id="kSlider" min="1" max="5" value="3"> <span id="kVal">3</span>
         </div>
+      </div>
 
-        <div class="card">
+      <div class="pipeline" id="pipeline">
+        <div class="stage" data-stage="chunk"><div class="connector"></div><div class="num">1</div><span>Chunk</span></div>
+        <div class="stage" data-stage="embed"><div class="connector"></div><div class="num">2</div><span>Vectorize</span></div>
+        <div class="stage" data-stage="score"><div class="connector"></div><div class="num">3</div><span>Score</span></div>
+        <div class="stage" data-stage="retrieve"><div class="connector"></div><div class="num">4</div><span>Retrieve</span></div>
+        <div class="stage" data-stage="generate"><div class="num">5</div><span>Generate</span></div>
+      </div>
 
-            <h2>Pipeline</h2>
+      <div id="results"></div>
+      <div id="answerBox">
+        <span class="label">Synthesized answer</span>
+        <div id="answerText"></div>
+        <div class="note">This is a template stitched from the retrieved chunks above — not a real model call. Highlighted terms are the ones shared with your query.</div>
+      </div>
 
-            <div class="steps">
-                <div class="step" id="s1">
-                    <div class="step-number">1</div>
-                    Chunking
-                </div>
-
-                <div class="step" id="s2">
-                    <div class="step-number">2</div>
-                    Embeddings
-                </div>
-
-                <div class="step" id="s3">
-                    <div class="step-number">3</div>
-                    Vector DB
-                </div>
-
-                <div class="step" id="s4">
-                    <div class="step-number">4</div>
-                    Retrieval
-                </div>
-
-                <div class="step" id="s5">
-                    <div class="step-number">5</div>
-                    Context
-                </div>
-
-                <div class="step" id="s6">
-                    <div class="step-number">6</div>
-                    Generation
-                </div>
-            </div>
-
-            <div class="output">
-
-                <div class="box">
-                    <div class="label">Chunks</div>
-                    <div id="chunks"></div>
-                </div>
-
-                <div class="box">
-                    <div class="label">Retrieved Chunks</div>
-                    <div id="retrieved"></div>
-                </div>
-
-                <div class="box">
-                    <div class="label">Prompt Sent To LLM</div>
-                    <div id="prompt"></div>
-                </div>
-
-                <div class="box">
-                    <div class="label">Generated Answer</div>
-                    <div id="answer" class="answer"></div>
-                </div>
-
-            </div>
-
+      <details>
+        <summary>How this simulation works</summary>
+        <div class="explain">
+          Every document is split into sentence-level chunks. Each chunk becomes a word-frequency vector — a real (if primitive) stand-in for an embedding. Your query becomes a vector the same way, and every chunk is ranked by <code>cosine similarity</code> against it: how much the two vectors point in the same direction. The top-<code>k</code> chunks are marked "retrieved," and the answer panel stitches their sentences together in rank order. Production RAG swaps the word-count vectors for dense embeddings from a trained model and the template for an LLM call — the shape of the pipeline is the same.
         </div>
-
+      </details>
     </div>
+  </div>
 </div>
 
 <script>
-function sleep(ms){
-    return new Promise(resolve=>setTimeout(resolve,ms));
-}
-
-function activate(id){
-    document.querySelectorAll(".step")
-        .forEach(s=>s.classList.remove("active"));
-
-    for(let i=1;i<=id;i++){
-        document.getElementById("s"+i)
-        .classList.add("active");
-    }
-}
+const STOP = new Set(['the','a','an','is','are','was','were','be','been','of','to','in','on','for','and','or','it','this','that','with','as','at','by','from','we','our','you','your','do','does','did','how','what','when','where','who','which','can','should','will','would','if','not','but','so','their','they','its','into']);
 
 function tokenize(text){
-    return text
-    .toLowerCase()
-    .replace(/[^\w\s]/g,"")
-    .split(/\s+/)
-    .filter(Boolean);
+  return text.toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(w => w.length > 1 && !STOP.has(w));
+}
+function vecFor(tokens){
+  const v = {};
+  tokens.forEach(t => v[t] = (v[t]||0) + 1);
+  return v;
+}
+function cosine(a,b){
+  let dot=0, na=0, nb=0;
+  for(const k in a) na += a[k]*a[k];
+  for(const k in b) nb += b[k]*b[k];
+  for(const k in a) if(b[k]) dot += a[k]*b[k];
+  const denom = Math.sqrt(na)*Math.sqrt(nb);
+  return denom ? dot/denom : 0;
+}
+function splitSentences(text){
+  return text.split(/(?<=[.?!])\s+/).map(s=>s.trim()).filter(s=>s.length>3);
+}
+function escapeHTML(s){
+  return s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+}
+function highlight(text, queryTokens){
+  const qset = new Set(queryTokens);
+  return text.split(/(\s+)/).map(word=>{
+    const bare = word.toLowerCase().replace(/[^a-z0-9]/g,'');
+    if(qset.has(bare)) return '<mark>'+escapeHTML(word)+'</mark>';
+    return escapeHTML(word);
+  }).join('');
 }
 
-function similarity(a,b){
+const SAMPLE_DOCS = [
+  { id:'DOC-01', title:'Scope Change Control', text:"All scope changes must route through the change control board before work begins. A change request needs a cost impact, a schedule impact, and a one-line business justification. Verbal approvals from a sponsor are not sufficient on their own." },
+  { id:'DOC-02', title:'Risk Register Cadence', text:"The risk register is reviewed every two weeks during the standing PMO sync. Each risk owner updates likelihood and impact before the meeting, not during it. Risks with a score above twelve get an explicit mitigation owner and a target date." },
+  { id:'DOC-03', title:'Stakeholder Communication', text:"Executive stakeholders receive a one-page status update on Fridays, no exceptions. Team-level stakeholders get detail in the daily stand-up instead. Escalations skip the weekly cadence entirely and go out the same day they are identified." },
+  { id:'DOC-04', title:'Agile Ceremony Guidelines', text:"Sprint planning is capped at ninety minutes for a two-week sprint. Retrospectives always end with three concrete action items, each with a single owner. A ceremony that consistently overruns its timebox is a signal to redesign it, not to extend it." },
+  { id:'DOC-05', title:'Vendor Onboarding', text:"New vendors complete a security questionnaire before contract signature, not after. Procurement and legal review run in parallel to avoid serial delays. A vendor without a signed data processing agreement cannot receive production access." },
+  { id:'DOC-06', title:'Budget Variance Reporting', text:"Any budget variance beyond ten percent triggers a written explanation in the monthly finance review. Variance explanations should separate timing differences from true cost overruns. Repeated variance in the same category over three months escalates to the sponsor." },
+  { id:'DOC-07', title:'Resource Allocation', text:"Resource requests are submitted two sprints ahead of need whenever possible. Shared specialists are booked through the central resource calendar, never through side agreements. Over-allocation above one hundred ten percent requires manager sign-off." },
+  { id:'DOC-08', title:'Lessons Learned Process', text:"Lessons learned are captured within one week of project close, while memory is fresh. Each lesson is tagged by category so future project leads can search it. A lesson without a proposed action is treated as an observation, not a lesson." }
+];
 
-    const setA = new Set(tokenize(a));
-    const setB = new Set(tokenize(b));
+let docs = [];
+let chunks = [];
 
-    let intersection = 0;
-
-    setA.forEach(word=>{
-        if(setB.has(word)) intersection++;
+function rebuildChunks(){
+  chunks = [];
+  docs.forEach(doc => {
+    splitSentences(doc.text).forEach((sentence, i) => {
+      chunks.push({ id: doc.id+'-'+(i+1), docTitle: doc.title, text: sentence });
     });
-
-    return intersection;
+  });
 }
 
-async function runRAG(){
-
-    document.getElementById("chunks").innerHTML="";
-    document.getElementById("retrieved").innerHTML="";
-    document.getElementById("prompt").innerHTML="";
-    document.getElementById("answer").innerHTML="";
-
-    const docs =
-    document.getElementById("docs")
-    .value
-    .split("\n")
-    .filter(x=>x.trim()!=='');
-
-    const query =
-    document.getElementById("query").value;
-
-    activate(1);
-    await sleep(700);
-
-    // Chunking
-    const chunksDiv=document.getElementById("chunks");
-
-    docs.forEach((chunk,i)=>{
-        chunksDiv.innerHTML +=
-        `<div class="chunk">
-        Chunk ${i+1}: ${chunk}
-        </div>`;
+function renderDocList(){
+  const list = document.getElementById('docList');
+  list.innerHTML = '';
+  docs.forEach(doc => {
+    const card = document.createElement('div');
+    card.className = 'doc-card';
+    card.innerHTML = `<button title="Remove" aria-label="Remove document" data-id="${doc.id}">&times;</button>
+      <span class="doc-title">${escapeHTML(doc.title)}</span>
+      <p>${escapeHTML(doc.text)}</p>`;
+    list.appendChild(card);
+  });
+  document.getElementById('docCount').textContent = docs.length ? `(${docs.length})` : '';
+  list.querySelectorAll('button[data-id]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      docs = docs.filter(d=>d.id !== btn.dataset.id);
+      rebuildChunks();
+      renderDocList();
+      clearResults();
     });
-
-    activate(2);
-    await sleep(700);
-
-    // Embeddings
-    const vectors=docs.map(chunk=>({
-        text:chunk,
-        vector:tokenize(chunk)
-    }));
-
-    activate(3);
-    await sleep(700);
-
-    // Vector DB
-    const vectorDB=vectors;
-
-    activate(4);
-    await sleep(700);
-
-    // Retrieval
-    const ranked = vectorDB
-        .map(v=>({
-            text:v.text,
-            score:similarity(query,v.text)
-        }))
-        .sort((a,b)=>b.score-a.score)
-        .slice(0,3);
-
-    ranked.forEach(r=>{
-        document.getElementById("retrieved").innerHTML +=
-        `<div class="chunk">
-            <div class="score">
-                Similarity Score: ${r.score}
-            </div>
-            ${r.text}
-        </div>`;
-    });
-
-    activate(5);
-    await sleep(700);
-
-    const context =
-    ranked.map(r=>r.text).join("\n");
-
-    const prompt = `
-Question:
-${query}
-
-Retrieved Context:
-${context}
-
-Answer using only retrieved context.
-`;
-
-    document.getElementById("prompt")
-    .innerText=prompt;
-
-    activate(6);
-    await sleep(700);
-
-    let answer =
-    ranked[0]?.text ||
-    "No relevant information found.";
-
-    document.getElementById("answer")
-    .innerText=answer;
+  });
 }
 
-runRAG();
+function loadSample(){
+  docs = SAMPLE_DOCS.map(d=>({...d}));
+  rebuildChunks();
+  renderDocList();
+  clearResults();
+}
+
+function clearResults(){
+  document.getElementById('results').innerHTML = '';
+  document.getElementById('answerBox').classList.remove('show');
+  document.querySelectorAll('.pipeline .stage').forEach(s=>s.classList.remove('active'));
+}
+
+let nextDocNum = SAMPLE_DOCS.length + 1;
+document.getElementById('addDocBtn').addEventListener('click', ()=>{
+  const ta = document.getElementById('newDoc');
+  const text = ta.value.trim();
+  if(!text) return;
+  docs.push({ id: 'DOC-'+String(nextDocNum).padStart(2,'0'), title: 'Custom entry', text });
+  nextDocNum++;
+  ta.value = '';
+  rebuildChunks();
+  renderDocList();
+});
+document.getElementById('resetDocsBtn').addEventListener('click', ()=>{ nextDocNum = SAMPLE_DOCS.length+1; loadSample(); });
+
+const kSlider = document.getElementById('kSlider');
+const kVal = document.getElementById('kVal');
+kSlider.addEventListener('input', ()=> kVal.textContent = kSlider.value);
+
+async function activateStages(){
+  const stages = document.querySelectorAll('.pipeline .stage');
+  for(const s of stages){
+    s.classList.add('active');
+    await new Promise(r=>setTimeout(r, 160));
+  }
+}
+
+document.getElementById('runBtn').addEventListener('click', async ()=>{
+  const query = document.getElementById('queryInput').value.trim();
+  const resultsEl = document.getElementById('results');
+  const answerBox = document.getElementById('answerBox');
+  const answerText = document.getElementById('answerText');
+
+  if(!query){
+    resultsEl.innerHTML = '<div class="empty-hint">Type a query above, then run retrieval.</div>';
+    answerBox.classList.remove('show');
+    return;
+  }
+  if(chunks.length === 0){
+    resultsEl.innerHTML = '<div class="empty-hint">The document store is empty — add a document first.</div>';
+    return;
+  }
+
+  document.getElementById('runBtn').disabled = true;
+  clearResults();
+  activateStages();
+
+  const qTokens = tokenize(query);
+  const qVec = vecFor(qTokens);
+  const scored = chunks.map(c => ({ ...c, score: cosine(qVec, vecFor(tokenize(c.text))) }))
+                        .sort((a,b) => b.score - a.score);
+
+  const k = parseInt(kSlider.value, 10);
+  const maxScore = scored[0]?.score || 1;
+
+  await new Promise(r=>setTimeout(r, 500));
+
+  resultsEl.innerHTML = '';
+  scored.forEach((c, idx) => {
+    const retrieved = idx < k && c.score > 0;
+    const div = document.createElement('div');
+    div.className = 'chunk' + (retrieved ? ' retrieved' : (c.score===0 ? ' dim' : ''));
+    const pct = maxScore > 0 ? Math.round((c.score/maxScore)*100) : 0;
+    div.innerHTML = `
+      <div class="rank">${idx+1}</div>
+      <div class="text"><span class="src">${escapeHTML(c.docTitle)}</span>${highlight(c.text, qTokens)}</div>
+      <div class="simbar-wrap">
+        <div class="simscore">${c.score.toFixed(3)}</div>
+        <div class="simbar"><i style="width:${pct}%"></i></div>
+      </div>`;
+    resultsEl.appendChild(div);
+  });
+
+  const top = scored.slice(0, k).filter(c=>c.score>0);
+  if(top.length){
+    const stitched = top.map(c => c.text).join(' ');
+    answerText.innerHTML = `Based on the ${top.length} most relevant passage${top.length>1?'s':''}: ${highlight(stitched, qTokens)}`;
+    answerBox.classList.add('show');
+  } else {
+    answerText.innerHTML = `No chunk shares meaningful vocabulary with that query — try rephrasing, or add a document that covers it.`;
+    answerBox.classList.add('show');
+  }
+
+  document.getElementById('runBtn').disabled = false;
+});
+
+document.getElementById('queryInput').addEventListener('keydown', e=>{
+  if(e.key === 'Enter') document.getElementById('runBtn').click();
+});
+
+loadSample();
 </script>
-
 </body>
 </html>
